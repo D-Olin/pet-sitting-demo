@@ -243,15 +243,7 @@ app.get("/edit-profile", isLoggedIn, async (req, res) => {
   if (req.session.userType == "employer") {
     try {
       // Fetch the current profile data from the database
-      const userData = await db.one(
-        `
-          SELECT a.name, a.location, e.budget
-          FROM app_user a
-          INNER JOIN employer e ON a.id = e.user_id
-          WHERE a.id = $1`,
-        [userId]
-      );
-
+      const userData = await db.one(` SELECT a.name, a.location, e.budget, e.id FROM app_user a JOIN employer e ON a.id = e.user_id WHERE a.id = $1`, [userId] );
       // Render the Handlebars template with the fetched data
       res.render("pages/edit-profile", {
         user: {
@@ -261,6 +253,7 @@ app.get("/edit-profile", isLoggedIn, async (req, res) => {
         },
         employer: {
           budget: userData.budget,
+          id:userData.id
         },
         email: req.session.email,
       });
@@ -360,6 +353,39 @@ app.post("/edit-profile", isLoggedIn, async (req, res) => {
     console.log(error);
     res.status(500).send("Error updating profile");
   }
+});
+
+
+
+app.post("/add-pet", isLoggedIn, async (req, res) => {
+  const userId = req.session.userId;
+  try {
+    const {pet_name,pet_type,pet_age,special_needs,employer_id} = req.body;
+    // Validate input
+    if (pet_name === undefined || pet_type === undefined || pet_age === undefined) {
+      return res.status(400).send("Invalid Pet Input");
+    }
+    await db.tx(async (t) => {
+      if (special_needs !== undefined) {
+        await t.none(`INSERT INTO PET (owner_id,name,pet_type,age,special_needs) VALUES ($1,$2,$3,$4,$5)`, [employer_id,pet_name,pet_type,pet_age,special_needs]);
+      }
+      else if (special_needs === undefined) {
+        await t.none(`INSERT INTO PET (owner_id,name,pet_type,age) VALUES ($1,$2,$3,$4)`, [employer_id,pet_name,pet_type,pet_age]);
+      }
+    });
+  } 
+  catch (error) {
+    console.log(error);
+    res.status(500).send("Error updating profile");
+  }
+  res.send(`
+    <script>
+        alert('Pet added successfully');
+        setTimeout(function() {
+        window.location.href = '/edit-profile';
+        }, 500);
+    </script>
+`);
 });
 
 // -------------------------------------  SERVER START   ---------------------------------------
